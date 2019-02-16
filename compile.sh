@@ -1,0 +1,1 @@
+javac -classpath editor.jar:. RunEffects.java

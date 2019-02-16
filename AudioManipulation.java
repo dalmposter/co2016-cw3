@@ -149,7 +149,14 @@ public class AudioManipulation
 	{
 
 		byte[] a = null;
-		int[] data, ch0, ch1;
+		int[] data;
+
+		// Decelerations left in to stay close to original in case I need to reconsider
+		// some functions
+		// It's not necessary to split the channels as they are both scaled the same
+		// based on the frame index
+		int[] ch0, ch1;
+
 		int max;
 
 		/*
@@ -190,17 +197,43 @@ public class AudioManipulation
 				data[i] = HB << 8 | (LB & 0xff);
 			}
 
-			// scale data linearly by a factor of 3/4 // **** NB this is the only part of
-			// scaleToZero that is not already part of // echo effect !!!! **** ??
+			// scale data linearly by a factor of 3/4
+			// **** NB this is the only part of
+			// scaleToZero that is not already part of
+			// echo effect !!!! **** ??
 			for (int i = 0; i < data.length / 2; i++)
 			{
-				// on the last frame of the ais this should evaluate to 1-(3/4) => 1/4
+				// on the last frame of the audio this should evaluate to 1-(3/4) => 1/4
 				double factor = 1 - ((3.0f / 4.0f) * (double) i / (double) (data.length / 2 - 1));
-				if (i % 1000 == 0)
-					System.out.println("scaling frame " + i + " with a factor of " + factor);
+				// if (i % 1000 == 0) System.out.println("scaling frame " + i + " with a factor
+				// of " + factor);
 				data[2 * i] = (int) ((double) data[2 * i] * factor);
 				data[2 * i + 1] = (int) ((double) data[2 * i + 1] * factor);
 			}
+
+			// *** This block is likely redundant as we only ever scale the amplitude down
+
+			// get the maximum amplitude
+			max = 0;
+			for (int i = 0; i < data.length; ++i)
+			{
+				max = Math.max(max, Math.abs(data[i]));
+			}
+
+			// 16 digit 2s-complement range from -2^15 to +2^15-1 = 256*128-1
+			// therefore we linearly scale data[i] values to lie within this range ..
+			// .. so that each data[i] has a 16 digit "HB.LB binary representation"
+			if (max > 256 * 128 - 1)
+			{
+				System.out.println("Sound values are linearly scaled by " + (256.0 * 128.0 - 1) / max
+						+ " because maximum amplitude is larger than upper boundary of allowed value range.");
+				for (int i = 0; i < data.length; ++i)
+				{
+					data[i] = (int) (data[i] * (256.0 * 128.0 - 1) / max);
+				}
+			}
+
+			// ****
 
 			// convert the integer array to a byte array
 			for (int i = 0; i < data.length; ++i)
@@ -260,16 +293,16 @@ public class AudioManipulation
 				double frameTime = 1 / frameRate;
 				double doneFrames = i * 2 / frameSize;
 				double t = frameTime * doneFrames;
-				
-				double amplitude = 100;
-				
+
+				double amplitude = 5000;
+
 				data[i] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
 				data[i + 1] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
 
 			}
 
 			// copy the int data[i] array into byte a[i] array ??
-			for(int i = 0; i < data.length; i++)
+			for (int i = 0; i < data.length; i++)
 			{
 				a[2 * i] = (byte) ((data[i] >> 8) & 0xff);
 				a[2 * i + 1] = (byte) (data[i] & 0xff);
@@ -336,21 +369,22 @@ public class AudioManipulation
 		/*
 		 * ----- template code commented out BEGIN
 		 */
-		
+
 		// create an empty AudioInputStream (of frame size 0)
 		// call it temp (already declared above)
 		byte[] c = new byte[1];
-		temp = new AudioInputStream(new ByteArrayInputStream(c),ais.getFormat(),0);
-		
-		// specify variable names for both the frequencies in Hz and note lengths in seconds
+		temp = new AudioInputStream(new ByteArrayInputStream(c), ais.getFormat(), 0);
+
+		// specify variable names for both the frequencies in Hz and note lengths in
+		// seconds
 		// eg double C4, D4 etc for frequencies and s, l, ll, lll for lengths
 		// Hint: Each octave results in a doubling of frequency.
-		
+
 		double C4 = 261.63;
 		double E4 = 329.63;
 		double F4 = 349.23;
 		double G4 = 392.00;
-		
+
 		double A4 = 440.00;
 		double B4 = 493.88;
 		double C5 = 523.25;
@@ -359,7 +393,7 @@ public class AudioManipulation
 		double Eb5 = 622.25;
 		double F5 = 2 * F4;
 		double G5 = 2 * G4;
-		
+
 		double A5 = 2 * A4;
 		double B5 = 2 * B4;
 		double C6 = 2 * C5;
@@ -367,44 +401,42 @@ public class AudioManipulation
 		double E6 = 2 * E5;
 		double F6 = 2 * F5;
 		double G6 = 2 * G5;
-		
+
 		double A6 = 2 * A5;
 		double B6 = 2 * B5;
 		double C7 = 2 * C6;
-		
+
 		// and the lengths in milliseconds
 		int s = 500;
 		int l = 2000;
 		int ll = 2500;
 		int lll = 2800;
-		
+
 		// also sprach zarathustra: 2001 A Space Odyssey
 		// specify the tune
-		double [][] notes = { {C4,l}, {G4, l}, {C5, l},
-							{E5, s}, {Eb5, lll},
-							{C4, l}, {G4, l}, {C5, l},
-							{Eb5, s}, {E5, lll},
-							{A5, s}, {B5, s}, {C6, l},
-							{A5, s}, {B5, s}, {C6, l},
-							{D6, ll},
-							{E6, s}, {F6, s}, {G6, l},
-							{E6, s}, {F6, s}, {G6, l},
-							{A6, l}, {B6, l}, {C7, lll}};
-		//100ms between each note EXCEPT: (5 => 6) and (10 => 11) which have 500ms between
-		
+		double[][] notes = { { C4, l }, { G4, l }, { C5, l }, { E5, s }, { Eb5, lll }, { C4, l }, { G4, l }, { C5, l },
+				{ Eb5, s }, { E5, lll }, { A5, s }, { B5, s }, { C6, l }, { A5, s }, { B5, s }, { C6, l }, { D6, ll },
+				{ E6, s }, { F6, s }, { G6, l }, { E6, s }, { F6, s }, { G6, l }, { A6, l }, { B6, l }, { C7, lll } };
+		// 100ms between each note EXCEPT: (5 => 6) and (10 => 11) which have 500ms
+		// between
+
 		// use addNote to build the tune as an AudioInputStream
-		// starting from the empty AudioInputStream temp (above) and adding each note one by one using A LOOP
-		//??
-		
-		//start with the last note as addNote places the note at the beginning, NOT the end.
-		for(int i = notes.length - 1; i >= 0; i--)
+		// starting from the empty AudioInputStream temp (above) and adding each note
+		// one by one using A LOOP
+		// ??
+
+		// start with the last note as addNote places the note at the beginning, NOT the
+		// end.
+		for (int i = notes.length - 1; i >= 0; i--)
 		{
 			temp = addNote(temp, notes[i][0], (int) notes[i][1]);
-			if(i == 5 || i == 10) temp = addNote(temp, 0, 500);
-			else temp = addNote(temp, 0, 100);
+			if (i == 5 || i == 10)
+				temp = addNote(temp, 0, 500);
+			else
+				temp = addNote(temp, 0, 100);
 		}
-		
-		/* 
+
+		/*
 		 * ----- template code commented out END
 		 */
 
@@ -419,16 +451,15 @@ public class AudioManipulation
 	public static AudioInputStream altChannels(AudioInputStream ais, double timeInterval)
 	{
 
-		/*
-		 * ----- template code commented out BEGIN
-		 * 
-		 * int frameSize = ais.getFormat().getFrameSize(); // = 4 float frameRate = ??
-		 * int frameInterval = ?? // number of frames played during timeInterval int
-		 * inputLengthInBytes = ?? int numChannels = ais.getFormat().getChannels(); // =
-		 * 2
-		 * 
-		 * ----- template code commented out END
-		 */
+		// plays the ais only in channel 0 for timeInterval, then in channel 1,
+		// inverting every [timeInterval] seconds
+
+		int frameSize = ais.getFormat().getFrameSize(); // = 4
+		float frameRate = ais.getFormat().getFrameRate();
+		int inputLengthInFrames = (int) ais.getFrameLength();
+		int frameInterval = (int) (frameRate * timeInterval); // number of frames played during timeInterval
+		int inputLengthInBytes = frameSize * inputLengthInFrames;
+		int numChannels = ais.getFormat().getChannels(); // = 2
 
 		// byte arrays for input channels and output channels
 		byte[] ich0, ich1, och0, och1;
@@ -439,36 +470,108 @@ public class AudioManipulation
 
 			/*
 			 * ----- template code commented out BEGIN
-			 * 
-			 * // create new byte arrays a for input and b for output of the right size //
-			 * ?? // fill the byte array a with the data of the AudioInputStream // ?? //
-			 * create new byte arrays for input and output channels of the right size // eg
-			 * ich0 = new byte[a.length/numChannels]; // ??
-			 * 
-			 * // fill up ich0 and ich1 by splitting a ??
-			 * 
-			 * //
-			 * ----------------------------------------------------------------------------
-			 * // compute the output channels from the input channels - this is the hard
-			 * part:
-			 * 
-			 * // int N = ?? ; // explained in CW3 worksheet - bytes per segment Ai (or Bi)
-			 * // int L = ?? ; // length of (either) input array // int outL = ?? ; //
-			 * length of (either) output array
-			 * 
-			 * // index i marks out start positions of double segments Ai O, (or Bi O) each
-			 * of length 2*N // index j counts individual bytes in segments Ai, each of
-			 * length N, going from 0 to N-1 // index k counts individual bytes in the final
-			 * segment E (or F), of length R = outL % N, going from 0 to R-1
-			 * 
-			 * // MAIN CODE HERE MAKING USE OF i, j, k, N, R ?? .....
-			 * 
-			 * // END OF compute the output channels from the input channels //
-			 * ----------------------------------------------------------------------------
-			 * 
-			 * // finally ... join och0 and och1 into b for (int i=0; i < b.length; i += 4)
-			 * { b[i] = och0[i/2]; // etc etc }
-			 * 
+			 */
+			// create new byte arrays a for input and b for output of the right size
+			a = new byte[(int) inputLengthInBytes];
+
+			// output size increased by factor of numChannels as we play each channels
+			// inputs in isolation in sequence
+			// we assume numChannels to be 2. Hard coding it to 2 to avoid problems if
+			// someone inputs unexpected audio.
+			// since the template uses 2 byte arrays (1 for each channel) instead of an
+			// array of byte arrays the approach is not expandable anyway.
+			b = new byte[(int) inputLengthInBytes * 2];
+
+			// fill the byte array a with the data of the AudioInputStream
+			ais.read(a);
+
+			// create new byte arrays for input and output channels of the right size
+			ich0 = new byte[a.length / numChannels];
+			ich1 = new byte[a.length / numChannels];
+
+			// fill up ich0 and ich1 by splitting a ??
+			for (int i = 0; i < a.length / 2; i++)
+			{
+				ich0[i] = a[i * 2];
+				ich1[i] = a[i * 2 + 1];
+			}
+
+			//
+			// ----------------------------------------------------------------------------
+			// compute the output channels from the input channels - this is the hard part:
+
+			int N = frameInterval * frameSize;
+			// explained in CW3 worksheet - bytes per segment Ai (or Bi)
+
+			int L = ich0.length;
+			// length of (either) input array (length of in * numChannels (assumed to be 2))
+			int outL = L * 2;
+			// length of (either) output array
+
+			och0 = new byte[outL];
+			och1 = new byte[outL];
+
+			// index i marks out start positions of double segments Ai O, (or Bi O) each of
+			// length 2*N
+			// index j counts individual bytes in segments Ai, each of length N, going from
+			// 0 to N-1
+			// index k counts individual bytes in the final segment E (or F), of length R =
+			// outL % N, going from 0 to R-1
+			int R = (outL % (2 * N)) / 2;
+			System.out.println("outL = " + outL + ", N = " + N + ", R (outL % N) = " + R);
+
+			// MAIN CODE HERE MAKING USE OF i, j, k, N, R ?? .....
+			for (int i = 0; i < (double) outL / (double) (2 * N) - 1; i++)
+			{
+				System.out.println("new j loop, start: " + (i * 2 * N) + ", end: " + ((i * 2 * N) + N + N - 1));
+				for (int j = 0; j < N; j++)
+				{
+					// First half (A0 in ch0, O in ch1)
+					och0[(i * 2 * N) + j] = ich0[(i * N) + j];
+					och1[(i * 2 * N) + j] = 0x00;
+
+					// Second half (B0 in ch1, O in ch0)
+					och0[(i * 2 * N) + j + N] = 0x00;
+					och1[(i * 2 * N) + j + N] = ich1[(i * N) + j];
+				}
+			}
+			
+			int lastSeg = (int) Math.floor((double) outL / (double) (2 * N));
+			
+			System.out.println("last segment, start: " + (lastSeg * 2 * N) + ", end: " + ((lastSeg * 2 * N) + R + R - 1));
+			for(int k = 0; k < R; k++)
+			{
+				och0[(lastSeg * 2 * N) + k] = ich0[(lastSeg * N) + k];
+				och1[(lastSeg * 2 * N) + k] = 0x00;
+				
+				och0[(lastSeg * 2 * N) + k + R] = 0x00;
+				och1[(lastSeg * 2 * N) + k + R] = ich1[(lastSeg * N) + k];
+			}
+
+			// END OF compute the output channels from the input channels //
+			// ----------------------------------------------------------------------------
+
+			// finally ... join och0 and och1 into b for (int i=0; i < b.length; i += 4) {
+			// b[i] = och0[i/2];
+			// etc etc }
+			
+			/*for(int i = 0; i < b.length; i+= 2)
+			{
+				b[i] = och0[i / 2];
+				b[i + 1] = och1[i / 2];
+			}*/
+			System.out.println("b.length: " + b.length);
+			System.out.println("och0/1.length: " + och0.length + ", " + och1.length);
+			
+			for(int i = 0; i < b.length; i += 4)
+			{
+				b[i] =  och0[i / 2];
+				b[i + 1] = och1[i / 2];
+				b[i + 2] = och0[i / 2 + 1];
+				b[i + 3] = och1[i / 2 + 1];
+			}
+
+			/*
 			 * ----- template code commented out END
 			 */
 
@@ -480,7 +583,7 @@ public class AudioManipulation
 
 		} catch (Exception e)
 		{
-			System.out.println("Something went wrong");
+			System.out.println("Exception occured in altChannels()");
 			e.printStackTrace();
 		}
 

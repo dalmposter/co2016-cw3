@@ -97,7 +97,7 @@ public class AudioManipulation {
 				data[i + 1] = ch1[i / 2];
 			}
 
-			// get the maximum amplitute
+			// get the maximum amplitude
 			max = 0;
 			for (int i = 0; i < data.length; ++i) {
 				max = Math.max(max, Math.abs(data[i]));
