@@ -294,7 +294,7 @@ public class AudioManipulation
 				double doneFrames = i * 2 / frameSize;
 				double t = frameTime * doneFrames;
 
-				double amplitude = 5000;
+				double amplitude = 500;
 
 				data[i] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
 				data[i + 1] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
