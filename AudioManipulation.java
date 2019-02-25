@@ -462,7 +462,7 @@ public class AudioManipulation
 		int numChannels = ais.getFormat().getChannels(); // = 2
 
 		// byte arrays for input channels and output channels
-		byte[] ich0, ich1, och0, och1;
+		int[] ich0, ich1, och0, och1, data;
 		byte[] a = null, b = null;
 
 		try
@@ -476,40 +476,52 @@ public class AudioManipulation
 
 			// output size increased by factor of numChannels as we play each channels
 			// inputs in isolation in sequence
-			// we assume numChannels to be 2. Hard coding it to 2 to avoid problems if
-			// someone inputs unexpected audio.
-			// since the template uses 2 byte arrays (1 for each channel) instead of an
-			// array of byte arrays the approach is not expandable anyway.
 			b = new byte[(int) inputLengthInBytes * 2];
 
 			// fill the byte array a with the data of the AudioInputStream
 			ais.read(a);
 
-			// create new byte arrays for input and output channels of the right size
-			ich0 = new byte[a.length / numChannels];
-			ich1 = new byte[a.length / numChannels];
+			data = new int[a.length / 2];
 
-			// fill up ich0 and ich1 by splitting a ??
-			for (int i = 0; i < a.length / 2; i++)
+			// convert byte array, a, into int array, data
+			for (int i = 0; i < data.length; ++i)
 			{
-				ich0[i] = a[i * 2];
-				ich1[i] = a[i * 2 + 1];
+				/* First byte is HB (most significant digits) - coerce to 32-bit int */
+				// HB =def sign_extend(a[2*i]) from 8 bit byte to 32 bit int
+				int HB = (int) a[2 * i];
+				/* Second byte is LB (least significant digits) - coerce to 32-bit int */
+				// LB =def sign_extend(a[2*i+1]) from 8 bit byte to 32 bit int
+				int LB = (int) a[2 * i + 1];
+				// note that data[i] =def sign_extend(HB.LB)
+				// | : Bool^32 x Bool^32 -----> Bool^32 where Bool = {0, 1}
+				data[i] = HB << 8 | (LB & 0xff);
+			}
+
+			// create new int arrays for input and output channels of the right size
+			ich0 = new int[data.length / numChannels];
+			ich1 = new int[data.length / numChannels];
+
+			och0 = new int[ich0.length * 2];
+			och1 = new int[och0.length];
+
+			// fill up ich0 and ich1 by splitting data
+			for (int i = 0; i < data.length / 2; i++)
+			{
+				ich0[i] = data[i * 2];
+				ich1[i] = data[i * 2 + 1];
 			}
 
 			//
 			// ----------------------------------------------------------------------------
 			// compute the output channels from the input channels - this is the hard part:
 
-			int N = frameInterval * frameSize;
-			// explained in CW3 worksheet - bytes per segment Ai (or Bi)
+			int N = frameInterval * frameSize / 2;
+			// ints per segment Ai (or Bi)
 
 			int L = ich0.length;
-			// length of (either) input array (length of in * numChannels (assumed to be 2))
+			// length of (either) input array
 			int outL = L * 2;
 			// length of (either) output array
-
-			och0 = new byte[outL];
-			och1 = new byte[outL];
 
 			// index i marks out start positions of double segments Ai O, (or Bi O) each of
 			// length 2*N
@@ -518,12 +530,12 @@ public class AudioManipulation
 			// index k counts individual bytes in the final segment E (or F), of length R =
 			// outL % N, going from 0 to R-1
 			int R = (outL % (2 * N)) / 2;
-			System.out.println("outL = " + outL + ", N = " + N + ", R (outL % N) = " + R);
+			//System.out.println("outL = " + outL + ", N = " + N + ", R (outL % N) = " + R);
 
 			// MAIN CODE HERE MAKING USE OF i, j, k, N, R ?? .....
 			for (int i = 0; i < (double) outL / (double) (2 * N) - 1; i++)
 			{
-				System.out.println("new j loop, start: " + (i * 2 * N) + ", end: " + ((i * 2 * N) + N + N - 1));
+				//System.out.println("new j loop, start: " + (i * 2 * N) + ", end: " + ((i * 2 * N) + N + N - 1));
 				for (int j = 0; j < N; j++)
 				{
 					// First half (A0 in ch0, O in ch1)
@@ -535,15 +547,15 @@ public class AudioManipulation
 					och1[(i * 2 * N) + j + N] = ich1[(i * N) + j];
 				}
 			}
-			
+
 			int lastSeg = (int) Math.floor((double) outL / (double) (2 * N));
-			
-			System.out.println("last segment, start: " + (lastSeg * 2 * N) + ", end: " + ((lastSeg * 2 * N) + R + R - 1));
-			for(int k = 0; k < R; k++)
+
+			//System.out.println("last segment, start: " + (lastSeg * 2 * N) + ", end: " + ((lastSeg * 2 * N) + R + R - 1));
+			for (int k = 0; k < R; k++)
 			{
 				och0[(lastSeg * 2 * N) + k] = ich0[(lastSeg * N) + k];
 				och1[(lastSeg * 2 * N) + k] = 0x00;
-				
+
 				och0[(lastSeg * 2 * N) + k + R] = 0x00;
 				och1[(lastSeg * 2 * N) + k + R] = ich1[(lastSeg * N) + k];
 			}
@@ -554,21 +566,40 @@ public class AudioManipulation
 			// finally ... join och0 and och1 into b for (int i=0; i < b.length; i += 4) {
 			// b[i] = och0[i/2];
 			// etc etc }
-			
-			/*for(int i = 0; i < b.length; i+= 2)
+
+			// combine output channels into int array, data
+			data = new int[och0.length * 2];
+			for (int i = 0; i < data.length; i += 2)
 			{
-				b[i] = och0[i / 2];
-				b[i + 1] = och1[i / 2];
-			}*/
-			System.out.println("b.length: " + b.length);
-			System.out.println("och0/1.length: " + och0.length + ", " + och1.length);
-			
-			for(int i = 0; i < b.length; i += 4)
+				data[i] = och0[i / 2];
+				data[i + 1] = och1[i / 2];
+			}
+
+			// get the maximum amplitute
+			int max = 0;
+			for (int i = 0; i < data.length; ++i)
 			{
-				b[i] =  och0[i / 2];
-				b[i + 1] = och1[i / 2];
-				b[i + 2] = och0[i / 2 + 1];
-				b[i + 3] = och1[i / 2 + 1];
+				max = Math.max(max, Math.abs(data[i]));
+			}
+
+			// 16 digit 2s-complement range from -2^15 to +2^15-1 = 256*128-1
+			// therefore we linearly scale data[i] values to lie within this range ..
+			// .. so that each data[i] has a 16 digit "HB.LB binary representation"
+			if (max > 256 * 128 - 1)
+			{
+				System.out.println("Sound values are linearly scaled by " + (256.0 * 128.0 - 1) / max
+						+ " because maximum amplitude is larger than upper boundary of allowed value range.");
+				for (int i = 0; i < data.length; ++i)
+				{
+					data[i] = (int) (data[i] * (256.0 * 128.0 - 1) / max);
+				}
+			}
+
+			// convert the integer array to a byte array
+			for (int i = 0; i < data.length; ++i)
+			{
+				b[2 * i] = (byte) ((data[i] >> 8) & 0xff);
+				b[2 * i + 1] = (byte) (data[i] & 0xff);
 			}
 
 			/*
