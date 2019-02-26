@@ -294,7 +294,9 @@ public class AudioManipulation
 				double doneFrames = i * 2 / frameSize;
 				double t = frameTime * doneFrames;
 
-				double amplitude = 5000;
+				//my computer has very customised sound settings which makes
+				//this very loud but sticking with the given amplitude of 64*256
+				double amplitude = 64*256;
 
 				data[i] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
 				data[i + 1] = (int) (amplitude * Math.sin(frequency * 2 * Math.PI * t));
